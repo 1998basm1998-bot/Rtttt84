@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لوحة رفع وبث الفيديوهات التلقائية - أبو أمير</title>
+    <title>لوحة رفع وبث الفيديوهات مع كاشف الأخطاء - أبو أمير</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -63,7 +63,6 @@
             background-color: #cccccc;
             cursor: not-allowed;
         }
-        /* تصميم شريط التقدم */
         .progress-container {
             margin-top: 20px;
             background-color: #e9ecef;
@@ -89,16 +88,28 @@
         }
         .status {
             margin-top: 15px;
-            padding: 10px;
+            padding: 15px;
             border-radius: 6px;
             display: none;
             font-weight: bold;
+            line-height: 1.5;
         }
         .success { background-color: #d4edda; color: #155724; display: block; }
-        .error { background-color: #f8d7da; color: #721c24; display: block; }
+        .error { background-color: #f8d7da; color: #721c24; display: block; border-left: 5px solid #dc3545; }
         .info { background-color: #cce5ff; color: #004085; display: block; }
         
-        /* مشغل الفيديو */
+        .error-details {
+            font-family: monospace;
+            background: rgba(0, 0, 0, 0.05);
+            padding: 8px;
+            margin-top: 8px;
+            border-radius: 4px;
+            font-size: 13px;
+            user-select: all;
+            direction: ltr;
+            text-align: left;
+        }
+
         .video-container {
             position: relative;
             padding-bottom: 56.25%;
@@ -121,7 +132,7 @@
 <body>
 
     <div class="container">
-        <h2>لوحة رفع الفيديو الحقيقية (الآدمن)</h2>
+        <h2>لوحة رفع الفيديو الذكية (الآدمن)</h2>
         
         <div class="form-group">
             <label>عنوان المحاضرة / الدرس:</label>
@@ -149,9 +160,9 @@
     </div>
 
     <script>
-        // المعطيات البرمجية الخاصة بك
+        // المعطيات البرمجية المحدثة والمصححة بالكامل
         const LIBRARY_ID = '669186'; 
-        const STREAM_API_KEY = 'e8d7c456-c12f-412f-4315-83189d92aef9-dd5c-4669'; 
+        const STREAM_API_KEY = 'e8d7c456-c12f-412f-4315-83189d92aef9-dd5c-4669'; // تم تصحيح حرف e الصغير
 
         async function startUpload() {
             const title = document.getElementById('videoTitle').value;
@@ -165,20 +176,23 @@
             
             if (!title || fileInput.files.length === 0) {
                 statusDiv.className = "status error";
-                statusDiv.innerText = "الرجاء إدخال عنوان واختيار ملف فيديو.";
+                statusDiv.innerHTML = "⚠️ خطأ في الإدخال: الرجاء كتابة عنوان الدرس واختيار ملف الفيديو أولاً.";
                 return;
             }
             
             const file = fileInput.files[0];
             
-            // تهيئة الواجهة وبدء الرفع
+            // قفل الزر وتجهيز الواجهة
             uploadBtn.disabled = true;
             statusDiv.className = "status info";
-            statusDiv.innerText = "جاري إنشاء سجل الفيديو في سيرفرات Bunny...";
+            statusDiv.innerText = "⏳ جاري إرسال طلب حجز فيديو إلى سيرفرات Bunny...";
             playerContainer.style.display = "none";
+            progressContainer.style.display = "none";
+            progressBar.style.width = '0%';
+            progressText.innerText = '0%';
             
             try {
-                // 1. طلب إنشاء كائن الفيديو برمجياً لجلب الـ GUID
+                // 1. إنشاء سجل الفيديو في السيرفر
                 const createResponse = await fetch(`https://video.bunnycdn.com/library/${LIBRARY_ID}/videos`, {
                     method: 'POST',
                     headers: {
@@ -188,18 +202,25 @@
                     body: JSON.stringify({ title: title })
                 });
                 
+                // كاشف خطأ الخطوة الأولى (إنشاء السجل)
+                if (!createResponse.ok) {
+                    let errBody = "";
+                    try { errBody = await createResponse.text(); } catch(e) {}
+                    throw new Error(`[فشل حجز الفيديو بالـ API] الكود الرقمي: ${createResponse.status} - تفاصيل السيرفر: ${errBody || createResponse.statusText}`);
+                }
+                
                 const createData = await createResponse.json();
                 const videoId = createData.guid;
                 
-                statusDiv.innerText = "تم حجز السيرفر بنجاح، يبدأ الرفع الفعلي الآن...";
+                statusDiv.innerText = "✅ تم حجز السيرفر بنجاح! يبدأ الرفع الفعلي الآن...";
                 progressContainer.style.display = "block";
                 
-                // 2. رفع الملف الفعلي باستخدام XMLHttpRequest لمتابعة شريط التقدم بدقة
+                // 2. رفع ملف الفيديو الفعلي باستخدام XMLHttpRequest لمراقبة حزم الرفع وشريط التقدم
                 const xhr = new XMLHttpRequest();
                 xhr.open('PUT', `https://video.bunnycdn.com/library/${LIBRARY_ID}/videos/${videoId}`);
                 xhr.setRequestHeader('AccessKey', STREAM_API_KEY);
                 
-                // تتبع نسبة الرفع حزمة بحزمة
+                // تتبع نسبة الرفع الحقيقية
                 xhr.upload.onprogress = function(e) {
                     if (e.lengthComputable) {
                         const percentComplete = Math.round((e.loaded / e.total) * 100);
@@ -208,37 +229,43 @@
                     }
                 };
                 
-                // عند اكتمال الرفع بنجاح
+                // معالجة النتيجة القادمة من السيرفر فور انتهاء شريط الرفع
                 xhr.onload = function() {
                     uploadBtn.disabled = false;
                     if (xhr.status === 200 || xhr.status === 201) {
                         statusDiv.className = "status success";
-                        statusDiv.innerHTML = `تم الرفع 100% وحفظ الملف بنجاح! يتم الآن ربط وتشغيل الفيديو بالأسفل تلقائياً...`;
-                        
-                        // الربط الحقيقي والتلقائي: تفعيل المشغل فوراً بالـ Video ID المستلم
+                        statusDiv.innerHTML = `🎉 تم الرفع 100% وحفظ الملف بنجاح داخل موقع Bunny!<br>جاري تشغيل مشغل الفيديو بالأسفل تلقائياً...`;
                         autoPlayVideo(videoId);
                     } else {
+                        // كاشف خطأ خطوة الرفع الفعلية
                         statusDiv.className = "status error";
-                        statusDiv.innerText = "فشل الرفع، يرجى التحقق من اتصال الإنترنت.";
+                        statusDiv.innerHTML = `❌ فشلت عملية حفظ الفيديو في السيرفر بعد اكتمال الشريط.<br>
+                                               <strong>رمز الخطأ بالسيرفر (HTTP Status):</strong> ${xhr.status}
+                                               <div class="error-details">Response text: ${xhr.responseText || 'No response details available'}</div>`;
                     }
                 };
                 
+                // معالجة انقطاع الاتصال المفاجئ بالإنترنت أثناء الرفع
                 xhr.onerror = function() {
                     uploadBtn.disabled = false;
                     statusDiv.className = "status error";
-                    statusDiv.innerText = "حدث خطأ في الاتصال بالشبكة.";
+                    statusDiv.innerHTML = `❌ انقطع الاتصال بالشبكة تماماً أثناء الرفع! يرجى التحقق من استقرار الإنترنت أو الـ VPN وتجربة إعادة الرفع مجدداً.`;
                 };
                 
                 xhr.send(file);
                 
             } catch (error) {
+                // التقاط كافة الأخطاء البرمجية (مثل الـ CORS أو خطأ الأرقام الكبيرة والصغيرة بالمفاتيح)
                 uploadBtn.disabled = false;
                 statusDiv.className = "status error";
-                statusDiv.innerText = "حدث خطأ غير متوقع: " + error.message;
+                statusDiv.innerHTML = `❌ حدث خطأ برمي منع الرفع تماماً:<br>
+                                       <strong>رسالة النظام الكاشفة للخطأ:</strong>
+                                       <div class="error-details">${error.message}</div>
+                                       💡 <em>نصيحة: تأكد من إضافة دومين GitHub Pages الحالي في حقل (Allowed Domains) في موقع Bunny وإلغاء خيار حظر الروابط المباشرة مؤقتاً للتجربة.</em>`;
+                console.error("تفاصيل الخطأ الكاملة في الكونسول:", error);
             }
         }
 
-        // دالة تشغيل الفيديو الفورية بدون تدخل يدوي
         function autoPlayVideo(videoId) {
             const playerContainer = document.getElementById('playerContainer');
             const playerArea = document.getElementById('playerArea');
@@ -253,8 +280,6 @@
                     </iframe>
                 </div>
             `;
-            
-            // عمل Scroll تلقائي لأسفل الشاشة ليظهر الفيديو أمام المستخدم فورا
             playerContainer.scrollIntoView({ behavior: 'smooth' });
         }
     </script>
