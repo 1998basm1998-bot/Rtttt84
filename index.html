@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لوحة رفع وبث الفيديوهات مع كاشف الأخطاء - أبو أمير</title>
+    <title>لوحة رفع وبث الفيديوهات التلقائية - أبو أمير</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -109,7 +109,6 @@
             direction: ltr;
             text-align: left;
         }
-
         .video-container {
             position: relative;
             padding-bottom: 56.25%;
@@ -160,9 +159,9 @@
     </div>
 
     <script>
-        // المعطيات البرمجية المحدثة والمصححة بالكامل
+        // الثوابت البرمجية المحدثة بالمفتاح الجديد الفعلي
         const LIBRARY_ID = '669186'; 
-        const STREAM_API_KEY = 'e8d7c456-c12f-412f-4315-83189d92aef9-dd5c-4669'; // تم تصحيح حرف e الصغير
+        const STREAM_API_KEY = '67000cfe-13a3-42c8-aba1047b41f4-4152-426a'; // تم وضع المفتاح الجديد هنا
 
         async function startUpload() {
             const title = document.getElementById('videoTitle').value;
@@ -176,16 +175,15 @@
             
             if (!title || fileInput.files.length === 0) {
                 statusDiv.className = "status error";
-                statusDiv.innerHTML = "⚠️ خطأ في الإدخال: الرجاء كتابة عنوان الدرس واختيار ملف الفيديو أولاً.";
+                statusDiv.innerHTML = "⚠️ خطأ: الرجاء كتابة عنوان الدرس واختيار ملف الفيديو أولاً.";
                 return;
             }
             
             const file = fileInput.files[0];
             
-            // قفل الزر وتجهيز الواجهة
             uploadBtn.disabled = true;
             statusDiv.className = "status info";
-            statusDiv.innerText = "⏳ جاري إرسال طلب حجز فيديو إلى سيرفرات Bunny...";
+            statusDiv.innerText = "⏳ جاري إرسال طلب حجز فيديو إلى سيرفرات Bunny بالهوية الجديدة...";
             playerContainer.style.display = "none";
             progressContainer.style.display = "none";
             progressBar.style.width = '0%';
@@ -202,25 +200,23 @@
                     body: JSON.stringify({ title: title })
                 });
                 
-                // كاشف خطأ الخطوة الأولى (إنشاء السجل)
                 if (!createResponse.ok) {
                     let errBody = "";
                     try { errBody = await createResponse.text(); } catch(e) {}
-                    throw new Error(`[فشل حجز الفيديو بالـ API] الكود الرقمي: ${createResponse.status} - تفاصيل السيرفر: ${errBody || createResponse.statusText}`);
+                    throw new Error(`[فشل حجز الفيديو] الكود الرقمي: ${createResponse.status} - تفاصيل: ${errBody || createResponse.statusText}`);
                 }
                 
                 const createData = await createResponse.json();
                 const videoId = createData.guid;
                 
-                statusDiv.innerText = "✅ تم حجز السيرفر بنجاح! يبدأ الرفع الفعلي الآن...";
+                statusDiv.innerText = "✅ تم التحقق من الهوية بنجاح! يبدأ الرفع الآن...";
                 progressContainer.style.display = "block";
                 
-                // 2. رفع ملف الفيديو الفعلي باستخدام XMLHttpRequest لمراقبة حزم الرفع وشريط التقدم
+                // 2. رفع ملف الفيديو الفعلي
                 const xhr = new XMLHttpRequest();
                 xhr.open('PUT', `https://video.bunnycdn.com/library/${LIBRARY_ID}/videos/${videoId}`);
                 xhr.setRequestHeader('AccessKey', STREAM_API_KEY);
                 
-                // تتبع نسبة الرفع الحقيقية
                 xhr.upload.onprogress = function(e) {
                     if (e.lengthComputable) {
                         const percentComplete = Math.round((e.loaded / e.total) * 100);
@@ -229,40 +225,34 @@
                     }
                 };
                 
-                // معالجة النتيجة القادمة من السيرفر فور انتهاء شريط الرفع
                 xhr.onload = function() {
                     uploadBtn.disabled = false;
                     if (xhr.status === 200 || xhr.status === 201) {
                         statusDiv.className = "status success";
-                        statusDiv.innerHTML = `🎉 تم الرفع 100% وحفظ الملف بنجاح داخل موقع Bunny!<br>جاري تشغيل مشغل الفيديو بالأسفل تلقائياً...`;
+                        statusDiv.innerHTML = `🎉 تم الرفع 100% بنجاح كامل بدون أي أخطاء أمنية!<br>جاري تشغيل الفيديو تلقائياً بالأسفل...`;
                         autoPlayVideo(videoId);
                     } else {
-                        // كاشف خطأ خطوة الرفع الفعلية
                         statusDiv.className = "status error";
-                        statusDiv.innerHTML = `❌ فشلت عملية حفظ الفيديو في السيرفر بعد اكتمال الشريط.<br>
-                                               <strong>رمز الخطأ بالسيرفر (HTTP Status):</strong> ${xhr.status}
-                                               <div class="error-details">Response text: ${xhr.responseText || 'No response details available'}</div>`;
+                        statusDiv.innerHTML = `❌ فشلت عملية حفظ الملف بعد الرفع.<br>
+                                               <strong>رمز الخطأ (HTTP):</strong> ${xhr.status}
+                                               <div class="error-details">${xhr.responseText || 'No response text'}</div>`;
                     }
                 };
                 
-                // معالجة انقطاع الاتصال المفاجئ بالإنترنت أثناء الرفع
                 xhr.onerror = function() {
                     uploadBtn.disabled = false;
                     statusDiv.className = "status error";
-                    statusDiv.innerHTML = `❌ انقطع الاتصال بالشبكة تماماً أثناء الرفع! يرجى التحقق من استقرار الإنترنت أو الـ VPN وتجربة إعادة الرفع مجدداً.`;
+                    statusDiv.innerHTML = `❌ انقطع الاتصال بالشبكة أثناء الرفع.`;
                 };
                 
                 xhr.send(file);
                 
             } catch (error) {
-                // التقاط كافة الأخطاء البرمجية (مثل الـ CORS أو خطأ الأرقام الكبيرة والصغيرة بالمفاتيح)
                 uploadBtn.disabled = false;
                 statusDiv.className = "status error";
-                statusDiv.innerHTML = `❌ حدث خطأ برمي منع الرفع تماماً:<br>
-                                       <strong>رسالة النظام الكاشفة للخطأ:</strong>
-                                       <div class="error-details">${error.message}</div>
-                                       💡 <em>نصيحة: تأكد من إضافة دومين GitHub Pages الحالي في حقل (Allowed Domains) في موقع Bunny وإلغاء خيار حظر الروابط المباشرة مؤقتاً للتجربة.</em>`;
-                console.error("تفاصيل الخطأ الكاملة في الكونسول:", error);
+                statusDiv.innerHTML = `❌ حدث خطأ منع الرفع تماماً:<br>
+                                       <div class="error-details">${error.message}</div>`;
+                console.error(error);
             }
         }
 
